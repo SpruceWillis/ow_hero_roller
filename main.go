@@ -200,13 +200,3 @@ func main() {
 		s.ApplicationCommandDelete(command.ApplicationID, appConfig.GuildID, command.ID)
 	}
 }
-
-// func slashCommands() []*discordgo.ApplicationCommand {
-// 	commands := []*discordgo.ApplicationCommand{
-// 		{
-// 			Name:       "roll-hero",
-// 			Description: "Roll an Overwatch hero",
-// 		},
-// 	}
-// 	return commands
-// }
