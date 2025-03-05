@@ -35,6 +35,7 @@ var (
 	appConfig      *secretsConfig
 	heroDataConfig *heroConfig
 	initErr        error
+	mappedHeroData *map[string][]heroData
 
 	commands = []*discordgo.ApplicationCommand{
 		{
@@ -102,9 +103,20 @@ func init() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+	if dataFilePath == "" {
+		log.Fatalf("Error: must provide a path to data config file")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 	appConfig, initErr = getAppConfigValues(appFilePath)
 	if initErr != nil {
 		log.Fatalf("Error: unable to parse application config YAML file %v", initErr)
+		flag.PrintDefaults()
+		os.Exit(2)
+	}
+	heroDataConfig, initErr = getHeroConfigValues(dataFilePath)
+	if initErr != nil {
+		log.Fatalf("Error: unable to parse data config YAML file %v", initErr)
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
@@ -122,6 +134,20 @@ func getAppConfigValues(filePath string) (*secretsConfig, error) {
 		return nil, err
 	}
 	return config, nil
+}
+
+func getHeroConfigValues(filePath string) (*heroConfig, error) {
+	file, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	var config *heroConfig
+	err = yaml.Unmarshal(file, &config)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+
 }
 
 // connect to discord
