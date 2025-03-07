@@ -36,10 +36,6 @@ var (
 	validRoles = []string{
 		"all", "tank", "dps", "support",
 	}
-	validImageTypes = []string{
-		"jpeg", "png", "gif",
-	}
-
 	commands = []*discordgo.ApplicationCommand{
 		{
 			Name:        "hero_roll",
@@ -168,20 +164,7 @@ func buildRollCommandHandler(heroesByRole *map[string][]*hero) func(*discordgo.S
 		if !ok {
 			roleValue = "all"
 		}
-		// TODO add a thumbnail/profile to accompany the message
-		if !slices.Contains(validRoles, roleValue) {
-			// TODO return Widow if an invalid role is entered
-			responseContent = "Invalid role provided. Valid roles are all (default), tank, support, dps"
-			// TODO extract this into a function
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: responseContent,
-				},
-			})
-			return
-		}
-
+		// TODO add a thumbnail/profile to the bot via web portal
 		validHeroes, ok := heroMap[roleValue]
 		// valid role provided but no hero data found
 		// this should never happen given the data, but is included for completeness
