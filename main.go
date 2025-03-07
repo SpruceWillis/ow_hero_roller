@@ -48,8 +48,26 @@ var (
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "role",
-					Description: "Roles to consider. Valid values are 'all' (default) 'dps' 'support' 'tank'",
-					Required:    false,
+					Description: "Roles to consider",
+					Required:    true,
+					Choices: []*discordgo.ApplicationCommandOptionChoice{
+						{
+							Name:  "all",
+							Value: "all",
+						},
+						{
+							Name:  "dps",
+							Value: "dps",
+						},
+						{
+							Name:  "support",
+							Value: "support",
+						},
+						{
+							Name:  "tank",
+							Value: "tank",
+						},
+					},
 				},
 			},
 		},
