@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/signal"
 	"slices"
@@ -17,11 +20,11 @@ import (
 type discordConfig struct {
 	GuildID  string `yaml:"guildId"`
 	BotToken string `yaml:"botToken"`
-	TenorKey string `yaml: tenorKey`
+	TenorKey string `yaml:"tenorKey"`
 }
 
 type heroConfig struct {
-	Heroes *[]hero `yaml:heroes`
+	Heroes *[]hero `yaml:"heroes"`
 }
 
 // config for each hero
@@ -32,7 +35,8 @@ type hero struct {
 }
 
 var (
-	validRoles = []string{
+	tenorSearchUrl = "https://tenor.googleapis.com/v2/search"
+	validRoles     = []string{
 		"all", "tank", "dps", "support",
 	}
 	commands = []*discordgo.ApplicationCommand{
@@ -139,9 +143,66 @@ func getOptionsFromDiscordInteraction(i *discordgo.InteractionCreate) map[string
 	return optionMap
 }
 
-func getHeroGif(heroName string) string {
-	fmt.Print(heroName)
-	return "https://media1.tenor.com/m/9ZOXumkFlwsAAAAd/tracer-overwatch.gif"
+// TODO improve json parsing with structured data
+func getGifFromJson(jsonBytes []byte) (string, error) {
+	var result map[string]any
+	err := json.Unmarshal(jsonBytes, &result)
+	if err != nil {
+		fmt.Println("error parsing JSON", err)
+	}
+	results, ok := result["results"]
+	if !ok {
+		return "", fmt.Errorf("no results found in json bytes %v", string(jsonBytes[:]))
+	}
+	resultArray := results.([]interface{})
+	if len(resultArray) == 0 {
+		return "", fmt.Errorf("no results found in json bytes %v", string(jsonBytes[:]))
+	}
+	mediaFormats := resultArray[0].(map[string]any)["media_formats"]
+	gifBlock, ok := mediaFormats.(map[string]any)["gif"]
+	if !ok {
+		return "", fmt.Errorf("no gif results found in first result of json bytes %v", string(jsonBytes[:]))
+	}
+	gifUrl, ok := gifBlock.(map[string]any)["url"]
+	if !ok {
+		return "", fmt.Errorf("no gif url found in first result of json bytes %v", string(jsonBytes[:]))
+	}
+	stringUrl := gifUrl.(string)
+	return stringUrl, nil
+}
+
+func getHeroGif(heroName string, apiKey string) (string, error) {
+	queryString := fmt.Sprintf("%v overwatch", heroName)
+	req, err := http.NewRequest("GET", tenorSearchUrl, nil)
+	if err != nil {
+		return "", err
+	}
+	queryParams := map[string]string{
+		"q":             queryString,
+		"key":           apiKey,
+		"locale":        "en_US",
+		"media_filter":  "gif",
+		"limit":         "1",
+		"contentFilter": "off",
+		"ar_range":      "all",
+		"random":        "true",
+	}
+	q := req.URL.Query()
+	for k, v := range queryParams {
+		q.Add(k, v)
+	}
+	req.URL.RawQuery = q.Encode()
+	req.Close = false
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		log.Printf("error requesting gif %v\n", err)
+		return "", err
+	}
+	return getGifFromJson(resBody)
 }
 
 func buildRollCommandHandler(heroesByRole *map[string][]*hero, tenorKey string) func(*discordgo.Session, *discordgo.InteractionCreate) {
@@ -170,30 +231,32 @@ func buildRollCommandHandler(heroesByRole *map[string][]*hero, tenorKey string) 
 			return
 		}
 		heroChoice := validHeroes[rand.Intn(len(validHeroes))]
-		// responseContent = heroChoice.Name
-		gifUrl := getHeroGif(heroChoice.Name)
-
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: responseContent,
-				Embeds: []*discordgo.MessageEmbed{
-					{
-						Type: discordgo.EmbedTypeGifv,
-						Image: &discordgo.MessageEmbedImage{
-							URL: gifUrl,
-						},
+		gifUrl, err := getHeroGif(heroChoice.Name, tenorKey)
+		var embeds []*discordgo.MessageEmbed
+		if err != nil {
+			embeds = []*discordgo.MessageEmbed{}
+		} else {
+			embeds = []*discordgo.MessageEmbed{
+				{
+					Type: discordgo.EmbedTypeGifv,
+					Image: &discordgo.MessageEmbedImage{
+						URL: gifUrl,
 					},
 				},
+			}
+		}
+
+		err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: heroChoice.Name,
+				Embeds:  embeds,
 			},
 		})
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-		// s.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
-		// 	Content:
-		// })
 	}
 }
 
