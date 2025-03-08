@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"slices"
 
 	"github.com/bwmarrin/discordgo"
@@ -19,6 +17,7 @@ import (
 type discordConfig struct {
 	GuildID  string `yaml:"guildId"`
 	BotToken string `yaml:"botToken"`
+	TenorKey string `yaml: tenorKey`
 }
 
 type heroConfig struct {
@@ -140,20 +139,12 @@ func getOptionsFromDiscordInteraction(i *discordgo.InteractionCreate) map[string
 	return optionMap
 }
 
-func getImageFileType(imageUrl string) string {
-	return filepath.Ext(imageUrl)
+func getHeroGif(heroName string) string {
+	fmt.Print(heroName)
+	return "https://media1.tenor.com/m/9ZOXumkFlwsAAAAd/tracer-overwatch.gif"
 }
 
-func toProtocol(protocol string, original string) (string, error) {
-	u, err := url.Parse(original)
-	if err != nil {
-		return "", err
-	}
-	u.Scheme = protocol
-	return u.String(), nil
-}
-
-func buildRollCommandHandler(heroesByRole *map[string][]*hero) func(*discordgo.Session, *discordgo.InteractionCreate) {
+func buildRollCommandHandler(heroesByRole *map[string][]*hero, tenorKey string) func(*discordgo.Session, *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		var responseContent string
 		// parse option data into a useable form
@@ -179,26 +170,30 @@ func buildRollCommandHandler(heroesByRole *map[string][]*hero) func(*discordgo.S
 			return
 		}
 		heroChoice := validHeroes[rand.Intn(len(validHeroes))]
-		responseContent = heroChoice.Name
+		// responseContent = heroChoice.Name
+		gifUrl := getHeroGif(heroChoice.Name)
 
-		if heroChoice.ImageLink == "" {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: responseContent,
-				},
-			})
-			return
-		}
-
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
 				Content: responseContent,
-				// Embeds:  embeds,
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Type: discordgo.EmbedTypeGifv,
+						Image: &discordgo.MessageEmbedImage{
+							URL: gifUrl,
+						},
+					},
+				},
 			},
 		})
-
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		// s.FollowupMessageCreate(i.Interaction, false, &discordgo.WebhookParams{
+		// 	Content:
+		// })
 	}
 }
 
@@ -222,7 +217,7 @@ func main() {
 		os.Exit(1)
 	}
 	mappedHeroData := mapByRole(heroData)
-	heroRollCommandHandler := buildRollCommandHandler(mappedHeroData)
+	heroRollCommandHandler := buildRollCommandHandler(mappedHeroData, appConfigValues.TenorKey)
 	s, err := initializeDiscordSession(appConfigValues)
 	if err != nil {
 		log.Fatalf("unable to initialize discord session: %v", err)
