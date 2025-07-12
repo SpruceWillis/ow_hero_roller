@@ -202,7 +202,6 @@ func buildRollCommandHandler(heroData *[]*hero, tenorKey string) func(*discordgo
 		}
 		validHeroes := make([]*hero, 0)
 		isAllRoles := roleValue == "all"
-		fmt.Printf("performing query with roles %v and stadium %v", roleValue, isStadium)
 		for _, heroDatum := range *heroData {
 			roleMatch := isAllRoles || heroDatum.Role == roleValue
 			stadiumMatch := !isStadium || heroDatum.Stadium
