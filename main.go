@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"slices"
 
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/yaml.v3"
@@ -24,22 +23,19 @@ type discordConfig struct {
 }
 
 type heroConfig struct {
-	Heroes *[]hero `yaml:"heroes"`
+	Heroes *[]*hero `yaml:"heroes"`
 }
 
 // config for each hero
 type hero struct {
-	Name      string `yaml:"name"`
-	Role      string `yaml:"role"`
-	ImageLink string `yaml:"imageLink"`
+	Name    string `yaml:"name"`
+	Role    string `yaml:"role"`
+	Stadium bool   `yaml:"stadium"`
 }
 
 var (
 	tenorSearchUrl = "https://tenor.googleapis.com/v2/search"
-	validRoles     = []string{
-		"all", "tank", "dps", "support",
-	}
-	commands = []*discordgo.ApplicationCommand{
+	commands       = []*discordgo.ApplicationCommand{
 		{
 			Name:        "hero_roll",
 			Description: "roll a random hero",
@@ -67,6 +63,12 @@ var (
 							Value: "tank",
 						},
 					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Name:        "stadium",
+					Description: "whether to consider only stadium heroes or not",
+					Required:    false,
 				},
 			},
 		},
@@ -103,42 +105,22 @@ func readConfigValues[T interface{}](filePath string) (*T, error) {
 	return config, nil
 }
 
-func mapByRole(heroData *heroConfig) *map[string][]*hero {
-	result := map[string][]*hero{
-		"all": make([]*hero, 0),
-	}
-	for _, heroDatum := range *heroData.Heroes {
-		if !slices.Contains(validRoles, heroDatum.Role) {
-			log.Fatalf("error: found invalid role %v at hero %v", heroDatum.Role, heroDatum.Name)
-			os.Exit(1)
-		}
-		result["all"] = append(result["all"], &heroDatum)
-		currentRoleHeroes, ok := result[heroDatum.Role]
-		var newRoleValue []*hero
-		if ok {
-			newRoleValue = append(currentRoleHeroes, &heroDatum)
-		} else {
-			newRoleValue = []*hero{
-				&heroDatum,
-			}
-		}
-		result[heroDatum.Role] = newRoleValue
-	}
-
-	return &result
-}
-
 // connect to discord
 func initializeDiscordSession(config *discordConfig) (*discordgo.Session, error) {
 	fmt.Println("initializing discord connection")
 	return discordgo.New("Bot " + config.BotToken)
 }
 
-func getOptionsFromDiscordInteraction(i *discordgo.InteractionCreate) map[string]string {
+func getOptionsFromDiscordInteraction(i *discordgo.InteractionCreate) map[string]any {
 	options := i.ApplicationCommandData().Options
-	optionMap := make(map[string]string, len(options))
+	optionMap := make(map[string]any, len(options))
 	for _, opt := range options {
-		optionMap[opt.Name] = opt.StringValue()
+		switch opt.Type {
+		case discordgo.ApplicationCommandOptionString:
+			optionMap[opt.Name] = opt.StringValue()
+		case discordgo.ApplicationCommandOptionBoolean:
+			optionMap[opt.Name] = opt.BoolValue()
+		}
 	}
 	return optionMap
 }
@@ -205,22 +187,33 @@ func getHeroGif(heroName string, apiKey string) (string, error) {
 	return getGifFromJson(resBody)
 }
 
-func buildRollCommandHandler(heroesByRole *map[string][]*hero, tenorKey string) func(*discordgo.Session, *discordgo.InteractionCreate) {
+func buildRollCommandHandler(heroData *[]*hero, tenorKey string) func(*discordgo.Session, *discordgo.InteractionCreate) {
 	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		var responseContent string
 		// parse option data into a useable form
-		heroMap := *heroesByRole
 		optionMap := getOptionsFromDiscordInteraction(i)
-		roleValue, ok := optionMap["role"]
-		// default value
+		roleValue, ok := optionMap["role"].(string)
 		if !ok {
 			roleValue = "all"
 		}
-		// TODO add a thumbnail/profile to the bot via web portal
-		validHeroes, ok := heroMap[roleValue]
+		isStadium, ok := optionMap["stadium"].(bool)
+		if !ok {
+			isStadium = false
+		}
+		validHeroes := make([]*hero, 0)
+		isAllRoles := roleValue == "all"
+		fmt.Printf("performing query with roles %v and stadium %v", roleValue, isStadium)
+		for _, heroDatum := range *heroData {
+			roleMatch := isAllRoles || heroDatum.Role == roleValue
+			stadiumMatch := !isStadium || heroDatum.Stadium
+			if roleMatch && stadiumMatch {
+				fmt.Printf("found match %v\n", heroDatum.Name)
+				validHeroes = append(validHeroes, heroDatum)
+			}
+		}
 		// valid role provided but no hero data found
 		// this should never happen given the data, but is included for completeness
-		if !ok || len(validHeroes) == 0 {
+		if len(validHeroes) == 0 {
 			responseContent = fmt.Sprintf("no heroes found for role %v", roleValue)
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -279,8 +272,7 @@ func main() {
 		log.Fatalf("unable to read hero data: %v", err)
 		os.Exit(1)
 	}
-	mappedHeroData := mapByRole(heroData)
-	heroRollCommandHandler := buildRollCommandHandler(mappedHeroData, appConfigValues.TenorKey)
+	heroRollCommandHandler := buildRollCommandHandler(heroData.Heroes, appConfigValues.TenorKey)
 	s, err := initializeDiscordSession(appConfigValues)
 	if err != nil {
 		log.Fatalf("unable to initialize discord session: %v", err)
