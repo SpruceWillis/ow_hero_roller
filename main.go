@@ -206,7 +206,6 @@ func buildRollCommandHandler(heroData *[]*hero, tenorKey string) func(*discordgo
 			roleMatch := isAllRoles || heroDatum.Role == roleValue
 			stadiumMatch := !isStadium || heroDatum.Stadium
 			if roleMatch && stadiumMatch {
-				fmt.Printf("found match %v\n", heroDatum.Name)
 				validHeroes = append(validHeroes, heroDatum)
 			}
 		}
