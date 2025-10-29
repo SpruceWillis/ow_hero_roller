@@ -1,3 +1,4 @@
 *.secret
 *.swp
 ow_hero_roller
+.vscode
