@@ -282,8 +282,8 @@ func main() {
 	log.Println("opening session")
 	err = s.Open()
 	if err != nil {
-		log.Fatalln("unable to open session")
-		os.Exit(4)
+		log.Println("unable to open session")
+		log.Fatalln(err)
 	}
 
 	defer s.Close()
