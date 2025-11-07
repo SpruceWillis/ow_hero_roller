@@ -1,4 +1,4 @@
-*.secret
+.env
 *.swp
 ow_hero_roller
 .vscode

@@ -15,13 +15,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// config for the overall application
-type discordConfig struct {
-	GuildID  string `yaml:"guildId"`
-	BotToken string `yaml:"botToken"`
-	TenorKey string `yaml:"tenorKey"`
-}
-
 type heroConfig struct {
 	Heroes *[]*hero `yaml:"heroes"`
 }
@@ -34,8 +27,7 @@ type hero struct {
 }
 
 var (
-	tenorSearchUrl = "https://tenor.googleapis.com/v2/search"
-	commands       = []*discordgo.ApplicationCommand{
+	commands = []*discordgo.ApplicationCommand{
 		{
 			Name:        "hero_roll",
 			Description: "roll a random hero",
@@ -75,21 +67,26 @@ var (
 	}
 )
 
+const (
+	tenorSearchUrl = "https://tenor.googleapis.com/v2/search"
+	TENOR_API_KEY  = "TENOR_API_KEY"
+	BOT_TOKEN      = "BOT_TOKEN"
+	GUILD_ID       = "GUILD_ID"
+)
+
 // establish flags and read config values
-func readAppFlags() (string, string) {
+func readAppFlags() string {
 	const (
 		defaultValue    = ""
 		discordOptUsage = "path to Discord config file"
 		heroOptUsage    = "path to hero data file"
 	)
 
-	var discordConfigPath, heroConfigPath string
-	flag.StringVar(&discordConfigPath, "file", defaultValue, discordOptUsage)
-	flag.StringVar(&discordConfigPath, "f", defaultValue, discordOptUsage)
+	var heroConfigPath string
 	flag.StringVar(&heroConfigPath, "data-file-name", defaultValue, heroOptUsage)
 	flag.StringVar(&heroConfigPath, "d", defaultValue, heroOptUsage)
 	flag.Parse()
-	return discordConfigPath, heroConfigPath
+	return heroConfigPath
 }
 
 func readConfigValues[T interface{}](filePath string) (*T, error) {
@@ -106,9 +103,9 @@ func readConfigValues[T interface{}](filePath string) (*T, error) {
 }
 
 // connect to discord
-func initializeDiscordSession(config *discordConfig) (*discordgo.Session, error) {
+func initializeDiscordSession(botToken string) (*discordgo.Session, error) {
 	fmt.Println("initializing discord connection")
-	return discordgo.New("Bot " + config.BotToken)
+	return discordgo.New("Bot " + botToken)
 }
 
 func getOptionsFromDiscordInteraction(i *discordgo.InteractionCreate) map[string]any {
@@ -252,16 +249,10 @@ func buildRollCommandHandler(heroData *[]*hero, tenorKey string) func(*discordgo
 }
 
 func main() {
-	discordConfigPath, heroDataConfigPath := readAppFlags()
-	if discordConfigPath == "" || heroDataConfigPath == "" {
-		log.Fatalf("Error: missing required file path")
+	heroDataConfigPath := readAppFlags()
+	if heroDataConfigPath == "" {
+		log.Println("Error: missing required file path")
 		flag.PrintDefaults()
-		os.Exit(1)
-	}
-
-	appConfigValues, err := readConfigValues[discordConfig](discordConfigPath)
-	if err != nil {
-		log.Fatalf("unable to read Discord connection configuration: %v", err)
 		os.Exit(1)
 	}
 
@@ -270,8 +261,24 @@ func main() {
 		log.Fatalf("unable to read hero data: %v", err)
 		os.Exit(1)
 	}
-	heroRollCommandHandler := buildRollCommandHandler(heroData.Heroes, appConfigValues.TenorKey)
-	s, err := initializeDiscordSession(appConfigValues)
+
+	tenorKey := os.Getenv(TENOR_API_KEY)
+	if tenorKey == "" {
+		log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
+	}
+
+	botToken := os.Getenv(BOT_TOKEN)
+	if botToken == "" {
+		log.Fatalf("unable to read bot token from environment variable %v", BOT_TOKEN)
+	}
+
+	guildId := os.Getenv(GUILD_ID)
+	if guildId == "" {
+		log.Fatalf("unable to read guild ID from environment variable %v", GUILD_ID)
+	}
+
+	heroRollCommandHandler := buildRollCommandHandler(heroData.Heroes, tenorKey)
+	s, err := initializeDiscordSession(botToken)
 	if err != nil {
 		log.Fatalf("unable to initialize discord session: %v", err)
 	}
@@ -291,7 +298,7 @@ func main() {
 	log.Println("adding commands")
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
 	for i, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, appConfigValues.GuildID, v)
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildId, v)
 		if err != nil {
 			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
 			return
@@ -308,6 +315,6 @@ func main() {
 	<-stop
 
 	for _, command := range registeredCommands {
-		s.ApplicationCommandDelete(command.ApplicationID, appConfigValues.GuildID, command.ID)
+		s.ApplicationCommandDelete(command.ApplicationID, guildId, command.ID)
 	}
 }
