@@ -1,4 +1,4 @@
-FROM golang as builder
+FROM golang AS builder
 
 WORKDIR /usr/src/app
 COPY go.* main.go /usr/src/app/
