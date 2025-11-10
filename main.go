@@ -261,9 +261,9 @@ func startBlockingServer(port int) {
 	}
 }
 
-func cleanupOnExit(s *discordgo.Session, guildId string, registeredCommands []*discordgo.ApplicationCommand) {
+func cleanupOnExit(s *discordgo.Session, registeredCommands []*discordgo.ApplicationCommand) {
 	for _, command := range registeredCommands {
-		s.ApplicationCommandDelete(command.ApplicationID, guildId, command.ID)
+		s.ApplicationCommandDelete(command.ApplicationID, "", command.ID)
 	}
 	s.Close()
 }
@@ -315,12 +315,10 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	defer s.Close()
-
 	log.Println("adding commands")
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
 	for i, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, guildId, v)
+		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
 		if err != nil {
 			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
 			return
@@ -337,6 +335,6 @@ func main() {
 		port = 8080
 	}
 
-	defer cleanupOnExit(s, guildId, registeredCommands)
+	defer cleanupOnExit(s, registeredCommands)
 	startBlockingServer(port)
 }
