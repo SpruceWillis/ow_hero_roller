@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/yaml.v3"
@@ -281,17 +282,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	tenorKey := os.Getenv(TENOR_API_KEY)
+	tenorKey := strings.TrimSpace(os.Getenv(TENOR_API_KEY))
 	if tenorKey == "" {
 		log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
 	}
 
-	botToken := os.Getenv(BOT_TOKEN)
+	botToken := strings.TrimSpace(os.Getenv(BOT_TOKEN))
 	if botToken == "" {
 		log.Fatalf("unable to read bot token from environment variable %v", BOT_TOKEN)
+	} else {
+		log.Printf("bot token successfully read from environment variable %v", BOT_TOKEN)
 	}
 
-	guildId := os.Getenv(GUILD_ID)
+	guildId := strings.TrimSpace(os.Getenv(GUILD_ID))
 	if guildId == "" {
 		log.Fatalf("unable to read guild ID from environment variable %v", GUILD_ID)
 	}
