@@ -5,7 +5,7 @@ ARG ARCH=amd64
 
 WORKDIR /usr/src/app
 COPY go.* main.go /usr/src/app/
-RUN  GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /usr/local/bin/ow_hero_roller .
+RUN  GOOS=${OS} GOARCH=${ARCH} CGO_ENABLED=0 go build -o /usr/local/bin/ow_hero_roller .
 
 FROM scratch
 COPY --from=builder /usr/local/bin/ow_hero_roller /usr/local/bin/ow_hero_roller
