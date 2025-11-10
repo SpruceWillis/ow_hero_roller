@@ -9,7 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"os/signal"
+	"strconv"
 
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/yaml.v3"
@@ -248,6 +248,25 @@ func buildRollCommandHandler(heroData *[]*hero, tenorKey string) func(*discordgo
 	}
 }
 
+func startBlockingServer(port int) {
+	log.Printf("starting server on port %v", port)
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "OK\n")
+	})
+	log.Println("Press Ctrl+C to exit")
+	err := http.ListenAndServe(fmt.Sprintf(":%v", port), nil)
+	if err != nil {
+		log.Fatalf("shutting down")
+	}
+}
+
+func cleanupOnExit(s *discordgo.Session, guildId string, registeredCommands []*discordgo.ApplicationCommand) {
+	for _, command := range registeredCommands {
+		s.ApplicationCommandDelete(command.ApplicationID, guildId, command.ID)
+	}
+	s.Close()
+}
+
 func main() {
 	heroDataConfigPath := readAppFlags()
 	if heroDataConfigPath == "" {
@@ -309,12 +328,12 @@ func main() {
 		heroRollCommandHandler(s, i)
 	})
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
-	log.Println("Press Ctrl+C to exit")
-	<-stop
-
-	for _, command := range registeredCommands {
-		s.ApplicationCommandDelete(command.ApplicationID, guildId, command.ID)
+	port, err := strconv.Atoi(os.Getenv("PORT"))
+	if err != nil {
+		log.Println("invalid or missing PORT env var, defaulting to 8080")
+		port = 8080
 	}
+
+	defer cleanupOnExit(s, guildId, registeredCommands)
+	startBlockingServer(port)
 }
