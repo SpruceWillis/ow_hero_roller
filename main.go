@@ -233,6 +233,48 @@ func handleRollCommand(heroData *[]*hero, tenorKey string, i *discordgo.Interact
 	}
 }
 
+func createCommandIfNeeded(botToken string) {
+	// Initialize Discord session for REST API calls
+	s, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		log.Fatalf("invalid bot parameters: %v", err)
+	}
+
+	// Get the bot's application ID
+	u, err := s.User("@me")
+	if err != nil {
+		log.Fatalf("unable to retrieve bot user: %v", err)
+	}
+	appID := u.ID
+
+	// Check if the command exists
+	existingCommands, err := s.ApplicationCommands(appID, "")
+	if err != nil {
+		log.Printf("unable to retrieve commands: %v", err)
+	}
+
+	commandExists := false
+	for _, cmd := range existingCommands {
+		if cmd.Name == "hero_roll" {
+			commandExists = true
+			log.Println("command 'hero_roll' already exists, skipping creation")
+			break
+		}
+	}
+
+	if !commandExists {
+		log.Println("command 'hero_roll' not found, creating it...")
+		_, err = s.ApplicationCommandCreate(appID, "", commands[0])
+		if err != nil {
+			log.Fatalf("Cannot create 'hero_roll' command: %v", err)
+		}
+		log.Println("command 'hero_roll' created successfully")
+	}
+
+	s.Close()
+
+}
+
 func verifySignature(r *http.Request, key string) bool {
 	signature := r.Header.Get("X-Signature-Ed25519")
 	timestamp := r.Header.Get("X-Signature-Timestamp")
@@ -272,6 +314,13 @@ func main() {
 	if publicKey == "" {
 		log.Fatalf("unable to read public key from environment variable %v", PUBLIC_KEY)
 	}
+
+	botToken := os.Getenv(BOT_TOKEN)
+	if botToken == "" {
+		log.Fatalf("unable to read bot token from environment variable %v", BOT_TOKEN)
+	}
+
+	createCommandIfNeeded(botToken)
 
 	http.HandleFunc("/interactions", func(w http.ResponseWriter, r *http.Request) {
 		if !verifySignature(r, publicKey) {
