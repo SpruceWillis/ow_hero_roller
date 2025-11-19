@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,7 +11,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -72,7 +73,7 @@ const (
 	tenorSearchUrl = "https://tenor.googleapis.com/v2/search"
 	TENOR_API_KEY  = "TENOR_API_KEY"
 	BOT_TOKEN      = "BOT_TOKEN"
-	GUILD_ID       = "GUILD_ID"
+	PUBLIC_KEY     = "PUBLIC_KEY"
 )
 
 // establish flags and read config values
@@ -101,12 +102,6 @@ func readConfigValues[T interface{}](filePath string) (*T, error) {
 		return nil, err
 	}
 	return config, nil
-}
-
-// connect to discord
-func initializeDiscordSession(botToken string) (*discordgo.Session, error) {
-	fmt.Println("initializing discord connection")
-	return discordgo.New("Bot " + botToken)
 }
 
 func getOptionsFromDiscordInteraction(i *discordgo.InteractionCreate) map[string]any {
@@ -185,87 +180,73 @@ func getHeroGif(heroName string, apiKey string) (string, error) {
 	return getGifFromJson(resBody)
 }
 
-func buildRollCommandHandler(heroData *[]*hero, tenorKey string) func(*discordgo.Session, *discordgo.InteractionCreate) {
-	return func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		var responseContent string
-		// parse option data into a useable form
-		optionMap := getOptionsFromDiscordInteraction(i)
-		roleValue, ok := optionMap["role"].(string)
-		if !ok {
-			roleValue = "all"
+func handleRollCommand(heroData *[]*hero, tenorKey string, i *discordgo.InteractionCreate) *discordgo.InteractionResponse {
+	// parse option data into a useable form
+	optionMap := getOptionsFromDiscordInteraction(i)
+	roleValue, ok := optionMap["role"].(string)
+	if !ok {
+		roleValue = "all"
+	}
+	isStadium, ok := optionMap["stadium"].(bool)
+	if !ok {
+		isStadium = false
+	}
+	validHeroes := make([]*hero, 0)
+	isAllRoles := roleValue == "all"
+	for _, heroDatum := range *heroData {
+		roleMatch := isAllRoles || heroDatum.Role == roleValue
+		stadiumMatch := !isStadium || heroDatum.Stadium
+		if roleMatch && stadiumMatch {
+			validHeroes = append(validHeroes, heroDatum)
 		}
-		isStadium, ok := optionMap["stadium"].(bool)
-		if !ok {
-			isStadium = false
-		}
-		validHeroes := make([]*hero, 0)
-		isAllRoles := roleValue == "all"
-		for _, heroDatum := range *heroData {
-			roleMatch := isAllRoles || heroDatum.Role == roleValue
-			stadiumMatch := !isStadium || heroDatum.Stadium
-			if roleMatch && stadiumMatch {
-				validHeroes = append(validHeroes, heroDatum)
-			}
-		}
-		// valid role provided but no hero data found
-		// this should never happen given the data, but is included for completeness
-		if len(validHeroes) == 0 {
-			responseContent = fmt.Sprintf("no heroes found for role %v", roleValue)
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: responseContent,
-				},
-			})
-			return
-		}
-		heroChoice := validHeroes[rand.Intn(len(validHeroes))]
-		gifUrl, err := getHeroGif(heroChoice.Name, tenorKey)
-		var embeds []*discordgo.MessageEmbed
-		if err != nil {
-			embeds = []*discordgo.MessageEmbed{}
-		} else {
-			embeds = []*discordgo.MessageEmbed{
-				{
-					Type: discordgo.EmbedTypeGifv,
-					Image: &discordgo.MessageEmbedImage{
-						URL: gifUrl,
-					},
-				},
-			}
-		}
+	}
 
-		err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	if len(validHeroes) == 0 {
+		return &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: heroChoice.Name,
-				Embeds:  embeds,
+				Content: fmt.Sprintf("no heroes found for role %v", roleValue),
 			},
-		})
-		if err != nil {
-			fmt.Println(err.Error())
-			return
 		}
 	}
+
+	heroChoice := validHeroes[rand.Intn(len(validHeroes))]
+	gifUrl, err := getHeroGif(heroChoice.Name, tenorKey)
+	var embeds []*discordgo.MessageEmbed
+	if err == nil {
+		embeds = []*discordgo.MessageEmbed{
+			{
+				Type: discordgo.EmbedTypeGifv,
+				Image: &discordgo.MessageEmbedImage{
+					URL: gifUrl,
+				},
+			},
+		}
+	}
+
+	return &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: heroChoice.Name,
+			Embeds:  embeds,
+		},
+	}
 }
 
-func startBlockingServer(port int) {
-	log.Printf("starting server on port %v", port)
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "OK\n")
-	})
-	log.Println("Press Ctrl+C to exit")
-	err := http.ListenAndServe(fmt.Sprintf(":%v", port), nil)
+func verifySignature(r *http.Request, key string) bool {
+	signature := r.Header.Get("X-Signature-Ed25519")
+	timestamp := r.Header.Get("X-Signature-Timestamp")
+
+	if signature == "" || timestamp == "" {
+		return false
+	}
+
+	keyBytes, err := hex.DecodeString(key)
 	if err != nil {
-		log.Fatalf("shutting down")
+		return false
 	}
-}
 
-func cleanupOnExit(s *discordgo.Session, registeredCommands []*discordgo.ApplicationCommand) {
-	for _, command := range registeredCommands {
-		s.ApplicationCommandDelete(command.ApplicationID, "", command.ID)
-	}
-	s.Close()
+	return discordgo.VerifyInteraction(r, ed25519.PublicKey(keyBytes))
 }
 
 func main() {
@@ -287,54 +268,55 @@ func main() {
 		log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
 	}
 
-	botToken := strings.TrimSpace(os.Getenv(BOT_TOKEN))
-	if botToken == "" {
-		log.Fatalf("unable to read bot token from environment variable %v", BOT_TOKEN)
-	} else {
-		log.Printf("bot token successfully read from environment variable %v", BOT_TOKEN)
+	publicKey := strings.TrimSpace(os.Getenv(PUBLIC_KEY))
+	if publicKey == "" {
+		log.Fatalf("unable to read public key from environment variable %v", PUBLIC_KEY)
 	}
 
-	guildId := strings.TrimSpace(os.Getenv(GUILD_ID))
-	if guildId == "" {
-		log.Fatalf("unable to read guild ID from environment variable %v", GUILD_ID)
-	}
-
-	heroRollCommandHandler := buildRollCommandHandler(heroData.Heroes, tenorKey)
-	s, err := initializeDiscordSession(botToken)
-	if err != nil {
-		log.Fatalf("unable to initialize discord session: %v", err)
-	}
-
-	s.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
-	})
-	log.Println("opening session")
-	err = s.Open()
-	if err != nil {
-		log.Println("unable to open session")
-		log.Fatalln(err)
-	}
-
-	log.Println("adding commands")
-	registeredCommands := make([]*discordgo.ApplicationCommand, len(commands))
-	for i, v := range commands {
-		cmd, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
-		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+	http.HandleFunc("/interactions", func(w http.ResponseWriter, r *http.Request) {
+		if !verifySignature(r, publicKey) {
+			http.Error(w, "invalid signature", http.StatusUnauthorized)
 			return
 		}
-		registeredCommands[i] = cmd
-	}
-	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		heroRollCommandHandler(s, i)
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "error reading request body", http.StatusInternalServerError)
+			return
+		}
+
+		var interaction discordgo.InteractionCreate
+		if err := json.Unmarshal(body, &interaction); err != nil {
+			http.Error(w, "error parsing json", http.StatusBadRequest)
+			return
+		}
+
+		switch interaction.Type {
+		case discordgo.InteractionPing:
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponsePong,
+			})
+		case discordgo.InteractionApplicationCommand:
+			if interaction.ApplicationCommandData().Name == "hero_roll" {
+				response := handleRollCommand(heroData.Heroes, tenorKey, &interaction)
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(response)
+			}
+		}
 	})
 
-	port, err := strconv.Atoi(os.Getenv("PORT"))
-	if err != nil {
-		log.Println("invalid or missing PORT env var, defaulting to 8080")
-		port = 8080
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "OK\n")
+	})
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	defer cleanupOnExit(s, registeredCommands)
-	startBlockingServer(port)
+	log.Printf("starting server on port %v", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
 }
