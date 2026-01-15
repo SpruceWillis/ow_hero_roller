@@ -18,11 +18,11 @@ import (
 )
 
 type heroConfig struct {
-	Heroes *[]*hero `yaml:"heroes"`
+	Heroes *[]*Hero `yaml:"heroes"`
 }
 
 // config for each hero
-type hero struct {
+type Hero struct {
 	Name    string `yaml:"name"`
 	Role    string `yaml:"role"`
 	Stadium bool   `yaml:"stadium"`
@@ -180,7 +180,20 @@ func getHeroGif(heroName string, apiKey string) (string, error) {
 	return getGifFromJson(resBody)
 }
 
-func handleRollCommand(heroData *[]*hero, tenorKey string, i *discordgo.InteractionCreate) *discordgo.InteractionResponse {
+func getValidHeroes(heroData *[]*Hero, role string, isStadium bool) []*Hero {
+	validHeroes := []*Hero{}
+	isAllRoles := role == "all"
+	for _, heroDatum := range *heroData {
+		roleMatch := isAllRoles || heroDatum.Role == role
+		stadiumMatch := !isStadium || heroDatum.Stadium
+		if roleMatch && stadiumMatch {
+			validHeroes = append(validHeroes, heroDatum)
+		}
+	}
+	return validHeroes
+}
+
+func handleRollCommand(heroData *[]*Hero, tenorKey string, i *discordgo.InteractionCreate) *discordgo.InteractionResponse {
 	// parse option data into a useable form
 	optionMap := getOptionsFromDiscordInteraction(i)
 	roleValue, ok := optionMap["role"].(string)
@@ -191,15 +204,8 @@ func handleRollCommand(heroData *[]*hero, tenorKey string, i *discordgo.Interact
 	if !ok {
 		isStadium = false
 	}
-	validHeroes := make([]*hero, 0)
-	isAllRoles := roleValue == "all"
-	for _, heroDatum := range *heroData {
-		roleMatch := isAllRoles || heroDatum.Role == roleValue
-		stadiumMatch := !isStadium || heroDatum.Stadium
-		if roleMatch && stadiumMatch {
-			validHeroes = append(validHeroes, heroDatum)
-		}
-	}
+
+	validHeroes := getValidHeroes(heroData, roleValue, isStadium)
 
 	if len(validHeroes) == 0 {
 		return &discordgo.InteractionResponse{
