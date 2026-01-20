@@ -38,11 +38,17 @@ jobs:
       with:
         service_account: 936238094361-compute@developer.gserviceaccount.com
         workload_identity_provider: projects/936238094361/locations/global/workloadIdentityPools/github/providers/my-repo
-    - name: 'Build and push container'
-      run: ./build_container.sh -p
-    - name: 'Upload config'
-      uses: 'google-github-actions/upload-cloud-storage@v3'
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v3'
       with:
-        path: '/'
-        destination: 'hero_config_data'
-        glob: '*.conf'
+        version: '>= 363.0.0'
+    - name: 'Use gcloud CLI'
+      run: 'gcloud info'
+    # - name: 'Build and push container'
+    #   run: ./build_container.sh -p
+    # - name: 'Upload config'
+    #   uses: 'google-github-actions/upload-cloud-storage@v3'
+    #   with:
+    #     path: '/'
+    #     destination: 'hero_config_data'
+    #     glob: '*.conf'
