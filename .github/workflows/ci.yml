@@ -45,4 +45,4 @@ jobs:
       with:
         path: '/'
         destination: 'hero_config_data'
-        glob: *.conf
+        glob: '*.conf'
