@@ -1,0 +1,48 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    - name: Run tests
+      run: go test -v ./...
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    if: github.ref == 'refs/head/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    - name: 'Google auth'
+      uses: 'google-github-actions/auth@v3'
+      with:
+        service_account: 936238094361-compute@developer.gserviceaccount.com
+        workload_identity_provider: projects/936238094361/locations/global/workloadIdentityPools/github/providers/my-repo
+    - name: 'Build and push container'
+      run: build_container.sh -p
+    - name: 'Upload config'
+      uses: 'google-github-actions/upload-cloud-storage@v3'
+      with:
+        path: '/'
+        destination: 'hero_config_data'
+        glob: *.conf
