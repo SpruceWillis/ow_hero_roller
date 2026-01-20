@@ -2,3 +2,4 @@
 *.swp
 ow_hero_roller
 .vscode
+gha-creds-*.json
