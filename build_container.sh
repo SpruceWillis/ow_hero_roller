@@ -1,14 +1,18 @@
 #! /bin/bash
 
 PUSH=false
+REGION='us-west1'
+TAG_BASE=''
 
-while getopts "p" flag; do
+while getopts ":pr:t:" flag; do
     case "${flag}" in
         p) PUSH=true ;;
+        r) REGION=${OPTARG} ;;
+        t) TAG_BASE=${OPTARG}
     esac
 done
 
-TAG="us-west1-docker.pkg.dev/ow-hero-roller-1741411768301/ow-hero-roller-docker/ow_hero_roller:$(git rev-parse --short HEAD)"
+TAG="${REGION}-docker.pkg.dev/${TAG_BASE}:$(git rev-parse --short HEAD)"
 docker buildx build -t $TAG --platform linux/amd64 .
 echo "Built image with tag: $TAG"
 
