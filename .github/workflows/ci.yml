@@ -50,6 +50,7 @@ jobs:
     - name: 'Upload config'
       uses: 'google-github-actions/upload-cloud-storage@v3'
       with:
-        path: '/'
+        path: '.'
+        parent: false
         destination: 'hero_config_data'
         glob: '*.conf'
