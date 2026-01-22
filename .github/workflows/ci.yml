@@ -44,9 +44,9 @@ jobs:
         version: '>= 363.0.0'
     - name: 'Docker auth'
       run: |-
-        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+        gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
     - name: 'Build and push container'
-      run: ./build_container.sh -p -r ${{ env.REGION }} -t ${{ env.TAG }}
+      run: ./build_container.sh -p -r ${{ vars.REGION }} -t ${{ vars.TAG }}
     - name: 'Upload config'
       uses: 'google-github-actions/upload-cloud-storage@v3'
       with:
