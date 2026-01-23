@@ -55,3 +55,14 @@ jobs:
         destination: 'hero_config_data'
         glob: '*.conf'
         gzip: false
+    - name: 'Deploy Cloud Run'
+      uses: 'google-github-actions/deploy-cloudrun@v3'
+      with:
+        service: 'ow-hero-roller'
+        image: ${{ vars.REGION }}-docker.pkg.dev/${{ vars.TAG }}:${{ github.sha }}
+        secrets: |-
+          BOT_TOKEN=discord_bot_token:1
+          TENOR_API_KEY=tenor_api_key:1
+          PUBLIC_KEY=discord_public_key:1
+        flags: '"--args=-d=/usr/local/hero_data/hero_data.conf"'
+        region: ${{ vars.REGION }}
