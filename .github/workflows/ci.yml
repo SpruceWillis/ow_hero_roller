@@ -46,7 +46,7 @@ jobs:
       run: |-
         gcloud auth configure-docker ${{ vars.REGION }}-docker.pkg.dev --quiet
     - name: 'Build and push container'
-      run: ./build_container.sh -p -r ${{ vars.REGION }} -t ${{ vars.TAG }}
+      run: ./build_container.sh -p -r ${{ vars.REGION }} -t ${{ vars.TAG }} -v ${{ github.sha }}
     - name: 'Upload config'
       uses: 'google-github-actions/upload-cloud-storage@v3'
       with:
