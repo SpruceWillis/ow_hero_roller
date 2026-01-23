@@ -66,3 +66,4 @@ jobs:
           PUBLIC_KEY=discord_public_key:1
         flags: '"--args=-d=/usr/local/hero_data/hero_data.conf"'
         region: ${{ vars.REGION }}
+        projected_id: ${{ vars.PROJECT_ID }}
