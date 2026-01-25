@@ -64,13 +64,18 @@ func getGifFromGiphyJson(jsonBytes []byte) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("no data found in json bytes %v", string(jsonBytes[:]))
 	}
-	dataArray := data.([]interface{})
+	dataArray := data.([]any)
 	if len(dataArray) == 0 {
 		return "", fmt.Errorf("no data found in json bytes %v", string(jsonBytes[:]))
 	}
-	gifUrl, ok := dataArray[0].(map[string]any)["embed_url"].(string)
+	gifObject, ok := dataArray[0].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("no gif found in json bytes %v", string(jsonBytes[:]))
+	}
+	gifUrl, ok := gifObject["images"].([]any)[0].(map[string]any)["downsized"].(map[string]any)["url"].(string)
 	if !ok {
 		return "", fmt.Errorf("no gif url found in json bytes %v", string(jsonBytes[:]))
 	}
+
 	return gifUrl, nil
 }
