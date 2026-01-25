@@ -64,6 +64,7 @@ jobs:
           BOT_TOKEN=discord_bot_token:1
           TENOR_API_KEY=tenor_api_key:1
           PUBLIC_KEY=discord_public_key:1
-        flags: '"--args=-d=/usr/local/hero_data/hero_data.conf"'
+          GIPHY_API_KEY=giphy_api_key:1
+        flags: '"--args=-d=/usr/local/hero_data/hero_data.conf,-g"'
         region: ${{ vars.REGION }}
         project_id: ${{ vars.PROJECT_ID }}
