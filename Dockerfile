@@ -4,8 +4,7 @@ ARG OS=linux
 ARG ARCH=amd64
 
 WORKDIR /usr/src/app
-COPY go.* main.go /usr/src/app/
-COPY internal /usr/src/app/internal
+COPY . /usr/src/app/
 RUN  GOOS=${OS} GOARCH=${ARCH} CGO_ENABLED=0 go build -o /usr/local/bin/ow_hero_roller .
 
 FROM scratch
