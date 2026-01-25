@@ -13,6 +13,8 @@ import (
 	"os"
 	"strings"
 
+	"internal/gifProvider"
+
 	"github.com/bwmarrin/discordgo"
 	"gopkg.in/yaml.v3"
 )
@@ -70,25 +72,26 @@ var (
 )
 
 const (
-	tenorSearchUrl = "https://tenor.googleapis.com/v2/search"
-	TENOR_API_KEY  = "TENOR_API_KEY"
-	BOT_TOKEN      = "BOT_TOKEN"
-	PUBLIC_KEY     = "PUBLIC_KEY"
+	TENOR_API_KEY = "TENOR_API_KEY"
+	GIPHY_API_KEY = "GIPHY_API_KEY"
+	BOT_TOKEN     = "BOT_TOKEN"
+	PUBLIC_KEY    = "PUBLIC_KEY"
 )
 
-// establish flags and read config values
-func readAppFlags() string {
+// TODO: either migrate to a config file and/or build a proper struct
+func readAppFlags() (string, bool) {
 	const (
-		defaultValue    = ""
-		discordOptUsage = "path to Discord config file"
-		heroOptUsage    = "path to hero data file"
+		heroOptUsage   = "path to hero data file"
+		giphyMigration = "whether to use Giphy instead"
 	)
 
 	var heroConfigPath string
-	flag.StringVar(&heroConfigPath, "data-file-name", defaultValue, heroOptUsage)
-	flag.StringVar(&heroConfigPath, "d", defaultValue, heroOptUsage)
+	var useGiphy bool
+	flag.StringVar(&heroConfigPath, "data-file-name", "", heroOptUsage)
+	flag.StringVar(&heroConfigPath, "d", "", heroOptUsage)
+	flag.BoolVar(&useGiphy, "g", false, giphyMigration)
 	flag.Parse()
-	return heroConfigPath
+	return heroConfigPath, useGiphy
 }
 
 func readConfigValues[T interface{}](filePath string) (*T, error) {
@@ -146,40 +149,6 @@ func getGifFromJson(jsonBytes []byte) (string, error) {
 	return stringUrl, nil
 }
 
-func getHeroGif(heroName string, apiKey string) (string, error) {
-	queryString := fmt.Sprintf("%v overwatch", heroName)
-	req, err := http.NewRequest("GET", tenorSearchUrl, nil)
-	if err != nil {
-		return "", err
-	}
-	queryParams := map[string]string{
-		"q":             queryString,
-		"key":           apiKey,
-		"locale":        "en_US",
-		"media_filter":  "gif",
-		"limit":         "1",
-		"contentFilter": "off",
-		"ar_range":      "all",
-		"random":        "true",
-	}
-	q := req.URL.Query()
-	for k, v := range queryParams {
-		q.Add(k, v)
-	}
-	req.URL.RawQuery = q.Encode()
-	req.Close = false
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Printf("error requesting gif %v\n", err)
-		return "", err
-	}
-	return getGifFromJson(resBody)
-}
-
 func getValidHeroes(heroData *[]*Hero, role string, isStadium bool) []*Hero {
 	validHeroes := []*Hero{}
 	isAllRoles := role == "all"
@@ -193,7 +162,7 @@ func getValidHeroes(heroData *[]*Hero, role string, isStadium bool) []*Hero {
 	return validHeroes
 }
 
-func handleRollCommand(heroData *[]*Hero, tenorKey string, i *discordgo.InteractionCreate) *discordgo.InteractionResponse {
+func handleRollCommand(heroData *[]*Hero, i *discordgo.InteractionCreate, provider gifProvider.GifProvider) *discordgo.InteractionResponse {
 	// parse option data into a useable form
 	optionMap := getOptionsFromDiscordInteraction(i)
 	roleValue, ok := optionMap["role"].(string)
@@ -217,7 +186,7 @@ func handleRollCommand(heroData *[]*Hero, tenorKey string, i *discordgo.Interact
 	}
 
 	heroChoice := validHeroes[rand.Intn(len(validHeroes))]
-	gifUrl, err := getHeroGif(heroChoice.Name, tenorKey)
+	gifUrl, err := provider.GetGifUrl(heroChoice.Name)
 	var embeds []*discordgo.MessageEmbed
 	if err == nil {
 		embeds = []*discordgo.MessageEmbed{
@@ -230,10 +199,11 @@ func handleRollCommand(heroData *[]*Hero, tenorKey string, i *discordgo.Interact
 		}
 	}
 
+	// TODO: giphy requires attribution, so add attribution to the provider
 	return &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: heroChoice.Name,
+			Content: provider.EmbedMessage(heroChoice.Name),
 			Embeds:  embeds,
 		},
 	}
@@ -298,7 +268,7 @@ func verifySignature(r *http.Request, key string) bool {
 }
 
 func main() {
-	heroDataConfigPath := readAppFlags()
+	heroDataConfigPath, useGiphy := readAppFlags()
 	if heroDataConfigPath == "" {
 		log.Println("Error: missing required file path")
 		flag.PrintDefaults()
@@ -311,9 +281,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	tenorKey := strings.TrimSpace(os.Getenv(TENOR_API_KEY))
-	if tenorKey == "" {
-		log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
+	var apiKey string
+	var provider gifProvider.GifProvider
+	if useGiphy {
+		apiKey = strings.TrimSpace(os.Getenv(GIPHY_API_KEY))
+		if apiKey == "" {
+			log.Fatalf("unable to read giphy API key from environment variable %v", GIPHY_API_KEY)
+		}
+		provider = gifProvider.NewGiphyProvider(apiKey)
+	} else {
+		apiKey = strings.TrimSpace(os.Getenv(TENOR_API_KEY))
+		if apiKey == "" {
+			log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
+		}
+		provider = gifProvider.NewTenorProvider(apiKey)
 	}
 
 	publicKey := strings.TrimSpace(os.Getenv(PUBLIC_KEY))
@@ -354,7 +335,7 @@ func main() {
 			})
 		case discordgo.InteractionApplicationCommand:
 			if interaction.ApplicationCommandData().Name == "hero_roll" {
-				response := handleRollCommand(heroData.Heroes, tenorKey, &interaction)
+				response := handleRollCommand(heroData.Heroes, &interaction, provider)
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(response)
 			}
