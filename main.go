@@ -74,24 +74,25 @@ var (
 const (
 	TENOR_API_KEY = "TENOR_API_KEY"
 	GIPHY_API_KEY = "GIPHY_API_KEY"
+	KLIPY_API_KEY = "KLIPY_API_KEY"
 	BOT_TOKEN     = "BOT_TOKEN"
 	PUBLIC_KEY    = "PUBLIC_KEY"
 )
 
 // TODO: either migrate to a config file and/or build a proper struct
-func readAppFlags() (string, bool) {
+func readAppFlags() (string, string) {
 	const (
-		heroOptUsage   = "path to hero data file"
-		giphyMigration = "whether to use Giphy instead"
+		heroOptUsage = "path to hero data file"
+		gifModeUsage = "what to use for gif source"
 	)
 
 	var heroConfigPath string
-	var useGiphy bool
+	var gifMode string
 	flag.StringVar(&heroConfigPath, "data-file-name", "", heroOptUsage)
 	flag.StringVar(&heroConfigPath, "d", "", heroOptUsage)
-	flag.BoolVar(&useGiphy, "g", false, giphyMigration)
+	flag.StringVar(&gifMode, "g", "", gifModeUsage)
 	flag.Parse()
-	return heroConfigPath, useGiphy
+	return heroConfigPath, gifMode
 }
 
 func readConfigValues[T interface{}](filePath string) (*T, error) {
@@ -268,7 +269,7 @@ func verifySignature(r *http.Request, key string) bool {
 }
 
 func main() {
-	heroDataConfigPath, useGiphy := readAppFlags()
+	heroDataConfigPath, gifMode := readAppFlags()
 	if heroDataConfigPath == "" {
 		log.Println("Error: missing required file path")
 		flag.PrintDefaults()
@@ -283,13 +284,20 @@ func main() {
 
 	var apiKey string
 	var provider gifProvider.GifProvider
-	if useGiphy {
+	switch gifMode {
+	case "giphy":
 		apiKey = strings.TrimSpace(os.Getenv(GIPHY_API_KEY))
 		if apiKey == "" {
 			log.Fatalf("unable to read giphy API key from environment variable %v", GIPHY_API_KEY)
 		}
 		provider = gifProvider.NewGiphyProvider(apiKey)
-	} else {
+	case "klipy":
+		apiKey = strings.TrimSpace(os.Getenv(KLIPY_API_KEY))
+		if apiKey == "" {
+			log.Fatalf("unable to read klipy API key from environment variable %v", GIPHY_API_KEY)
+		}
+		provider = gifProvider.NewKlipyProvider(apiKey)
+	default:
 		apiKey = strings.TrimSpace(os.Getenv(TENOR_API_KEY))
 		if apiKey == "" {
 			log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
