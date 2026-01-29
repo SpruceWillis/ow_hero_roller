@@ -233,15 +233,14 @@ var giphyJsonResponse = `{
 }
 `
 
-var expectedResult = "https://media1.giphy.com/media/v1.Y2lkPTUyMWU1ODhiNnc5a2o2aGlqbXBuNG16bTg2enFmbjVzeG5pbGI4M2JibXdtZGtlYiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/erePhJFWkfYMwTpNT8/giphy.gif"
-
 func TestGetGifFromGiphyJson(t *testing.T) {
 	stringBytes := []byte(giphyJsonResponse)
+	expectedResult := "https://media1.giphy.com/media/v1.Y2lkPTUyMWU1ODhiNnc5a2o2aGlqbXBuNG16bTg2enFmbjVzeG5pbGI4M2JibXdtZGtlYiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/erePhJFWkfYMwTpNT8/giphy.gif"
 	result, err := getGifFromGiphyJson(stringBytes)
 	if err != nil {
 		t.Errorf("error getting gif from giphy json: %v", err)
-	}
-	if result != expectedResult {
+		return
+	} else if result != expectedResult {
 		t.Errorf("expected gif url to be %v, got %v", expectedResult, result)
 	}
 }
