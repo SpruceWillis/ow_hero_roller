@@ -32,7 +32,7 @@ func (k *KlipyProvider) GetGifUrl(heroName string) (string, error) {
 		"country":       "US",
 		"locale":        "en_US",
 		"contentfilter": "off",
-		"format_filter": "mp4",
+		"format_filter": "gif",
 		"limit":         "1",
 	}
 	q := req.URL.Query()
@@ -65,13 +65,13 @@ func getGifFromKlipyJson(jsonBytes []byte) (string, error) {
 	}
 	resultGif := results[0]
 	mediaFormats := resultGif.(map[string]any)["media_formats"]
-	mp4Block, ok := mediaFormats.(map[string]any)["mp4"]
+	mp4Block, ok := mediaFormats.(map[string]any)["gif"]
 	if !ok {
-		return "", fmt.Errorf("no mp4 results found in first result of json bytes %v", string(jsonBytes[:]))
+		return "", fmt.Errorf("no gif results found in first result of json bytes %v", string(jsonBytes[:]))
 	}
 	url, ok := mp4Block.(map[string]any)["url"]
 	if !ok {
-		return "", fmt.Errorf("no mp4 results found in first result of json bytes %v", string(jsonBytes[:]))
+		return "", fmt.Errorf("no gif results found in first result of json bytes %v", string(jsonBytes[:]))
 	}
 	return url.(string), nil
 }

@@ -177,7 +177,7 @@ var klipyJsonResponse = `{
 func TestGetGifFromKlipyJson(t *testing.T) {
 	stringBytes := []byte(klipyJsonResponse)
 	result, err := getGifFromKlipyJson(stringBytes)
-	expectedResult := "https://static.klipy.com/ii/d7aec6f6f171607374b2065c836f92f4/ec/f3/kRvr7yGzX0V876EitO2Z.mp4"
+	expectedResult := "https://static.klipy.com/ii/d7aec6f6f171607374b2065c836f92f4/ec/f3/p30ORxL1.gif"
 	if err != nil {
 		t.Errorf("error getting mp4 from klipy json: %v", err)
 	} else if result != expectedResult {
