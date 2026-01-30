@@ -70,4 +70,4 @@ jobs:
         region: ${{ vars.REGION }}
         project_id: ${{ vars.PROJECT_ID }}
         env_vars: |-
-          KLIPY_GIF_LIMIT="5"
+          KLIPY_GIF_LIMIT=5
