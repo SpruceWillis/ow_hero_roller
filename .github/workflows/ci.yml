@@ -69,3 +69,5 @@ jobs:
         flags: '"--args=-d=/usr/local/hero_data/hero_data.conf,-g=klipy"'
         region: ${{ vars.REGION }}
         project_id: ${{ vars.PROJECT_ID }}
+        env_vars: |-
+          KLIPY_GIF_LIMIT="5"

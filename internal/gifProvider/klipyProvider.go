@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
+	"strconv"
 )
 
 type KlipyProvider struct {
 	ApiKey string
+	Limit  int
 }
 
 const klipySearchUrl = "https://api.klipy.com/v2/search"
 
-func NewKlipyProvider(apiKey string) *KlipyProvider {
+func NewKlipyProvider(apiKey string, limit int) *KlipyProvider {
 	return &KlipyProvider{
 		ApiKey: apiKey,
+		Limit:  limit,
 	}
 }
 
@@ -33,7 +37,7 @@ func (k *KlipyProvider) GetGifUrl(heroName string) (string, error) {
 		"locale":        "en_US",
 		"contentfilter": "off",
 		"format_filter": "gif",
-		"limit":         "1",
+		"limit":         strconv.Itoa(k.Limit),
 		"random":        "true",
 	}
 	q := req.URL.Query()
@@ -64,7 +68,8 @@ func getGifFromKlipyJson(jsonBytes []byte) (string, error) {
 	if !ok || len(results) == 0 {
 		return "", fmt.Errorf("no results found in json bytes %v", string(jsonBytes[:]))
 	}
-	resultGif := results[0]
+	randIndex := rand.Intn(len(results))
+	resultGif := results[randIndex]
 	mediaFormats := resultGif.(map[string]any)["media_formats"]
 	mp4Block, ok := mediaFormats.(map[string]any)["gif"]
 	if !ok {

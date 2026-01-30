@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"internal/gifProvider"
@@ -72,11 +73,12 @@ var (
 )
 
 const (
-	TENOR_API_KEY = "TENOR_API_KEY"
-	GIPHY_API_KEY = "GIPHY_API_KEY"
-	KLIPY_API_KEY = "KLIPY_API_KEY"
-	BOT_TOKEN     = "BOT_TOKEN"
-	PUBLIC_KEY    = "PUBLIC_KEY"
+	TENOR_API_KEY   = "TENOR_API_KEY"
+	GIPHY_API_KEY   = "GIPHY_API_KEY"
+	KLIPY_API_KEY   = "KLIPY_API_KEY"
+	BOT_TOKEN       = "BOT_TOKEN"
+	PUBLIC_KEY      = "PUBLIC_KEY"
+	KLIPY_GIF_LIMIT = "KLIPY_GIF_LIMIT"
 )
 
 // TODO: either migrate to a config file and/or build a proper struct
@@ -296,7 +298,17 @@ func main() {
 		if apiKey == "" {
 			log.Fatalf("unable to read klipy API key from environment variable %v", GIPHY_API_KEY)
 		}
-		provider = gifProvider.NewKlipyProvider(apiKey)
+		limit := strings.TrimSpace(os.Getenv(KLIPY_GIF_LIMIT))
+		if limit == "" {
+			limit = "1"
+		}
+		numLimit, err := strconv.Atoi(limit)
+		if err != nil {
+			log.Fatalf("invalid klipy gif limit found: %v", limit)
+		} else {
+			log.Printf("initializing klipy client with gif limit %v", numLimit)
+		}
+		provider = gifProvider.NewKlipyProvider(apiKey, numLimit)
 	default:
 		apiKey = strings.TrimSpace(os.Getenv(TENOR_API_KEY))
 		if apiKey == "" {
