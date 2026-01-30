@@ -34,6 +34,7 @@ func (k *KlipyProvider) GetGifUrl(heroName string) (string, error) {
 		"contentfilter": "off",
 		"format_filter": "gif",
 		"limit":         "1",
+		"random":        "true",
 	}
 	q := req.URL.Query()
 	for k, v := range queryParams {
