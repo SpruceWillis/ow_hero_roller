@@ -66,7 +66,7 @@ jobs:
           PUBLIC_KEY=discord_public_key:1
           GIPHY_API_KEY=giphy_api_key:1
           KLIPY_API_KEY=klipy_api_key:1
-        flags: '"--args=-d=/usr/local/hero_data/hero_data.conf,-g=klipy" "--startup-probe=initialDelaySeconds=5,periodSeconds=1,httpGet.path=/health,httpGet.port=8080"'
+        flags: '"--args=-d=/usr/local/hero_data/hero_data.conf,-g=klipy" "--startup-probe=initialDelaySeconds=4,periodSeconds=1,httpGet.path=/health,httpGet.port=8080"'
         region: ${{ vars.REGION }}
         project_id: ${{ vars.PROJECT_ID }}
         env_vars: |-
