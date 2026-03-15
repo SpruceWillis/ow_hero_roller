@@ -349,11 +349,13 @@ func main() {
 
 		switch interaction.Type {
 		case discordgo.InteractionPing:
+			log.Println("received discord ping, responding with pong")
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponsePong,
 			})
 		case discordgo.InteractionApplicationCommand:
+			log.Println("received discord application command, processing")
 			if interaction.ApplicationCommandData().Name == "hero_roll" {
 				response := handleRollCommand(heroData.Heroes, &interaction, provider)
 				w.Header().Set("Content-Type", "application/json")
@@ -363,6 +365,7 @@ func main() {
 	})
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("received health check, responding with OK")
 		io.WriteString(w, "OK\n")
 	})
 
