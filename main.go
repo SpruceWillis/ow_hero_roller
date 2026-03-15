@@ -212,12 +212,18 @@ func handleRollCommand(heroData *[]*Hero, i *discordgo.InteractionCreate, provid
 	}
 }
 
+func performSetup(botToken string) {
+	go createCommandIfNeeded(botToken)
+}
+
 func createCommandIfNeeded(botToken string) {
 	// Initialize Discord session for REST API calls
 	s, err := discordgo.New("Bot " + botToken)
 	if err != nil {
 		log.Fatalf("invalid bot parameters: %v", err)
 	}
+
+	defer s.Close()
 
 	// Get the bot's application ID
 	u, err := s.User("@me")
@@ -249,9 +255,6 @@ func createCommandIfNeeded(botToken string) {
 		}
 		log.Println("command 'hero_roll' created successfully")
 	}
-
-	s.Close()
-
 }
 
 func verifySignature(r *http.Request, key string) bool {
@@ -327,7 +330,7 @@ func main() {
 		log.Fatalf("unable to read bot token from environment variable %v", BOT_TOKEN)
 	}
 
-	createCommandIfNeeded(botToken)
+	performSetup(botToken)
 
 	http.HandleFunc("/interactions", func(w http.ResponseWriter, r *http.Request) {
 		if !verifySignature(r, publicKey) {
