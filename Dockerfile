@@ -9,5 +9,6 @@ RUN  GOOS=${OS} GOARCH=${ARCH} CGO_ENABLED=0 go build -o /usr/local/bin/ow_hero_
 
 FROM scratch
 COPY --from=builder /usr/local/bin/ow_hero_roller /usr/local/bin/ow_hero_roller
+COPY --from=builder /usr/src/app/hero_data.conf /etc/hero_data.conf
 
 ENTRYPOINT [ "/usr/local/bin/ow_hero_roller" ]

@@ -62,11 +62,10 @@ jobs:
         image: ${{ vars.REGION }}-docker.pkg.dev/${{ vars.TAG }}:${{ github.sha }}
         secrets: |-
           BOT_TOKEN=discord_bot_token:1
-          TENOR_API_KEY=tenor_api_key:1
           PUBLIC_KEY=discord_public_key:1
           GIPHY_API_KEY=giphy_api_key:1
           KLIPY_API_KEY=klipy_api_key:1
-        flags: '"--args=-d=/usr/local/hero_data/hero_data.conf,-g=klipy" "--startup-probe=initialDelaySeconds=4,periodSeconds=1,httpGet.path=/health,httpGet.port=8080"'
+        flags: '"--args=-d=/etc/hero_data.conf,-g=klipy" "--startup-probe=initialDelaySeconds=1,periodSeconds=1,httpGet.path=/health,httpGet.port=8080"'
         region: ${{ vars.REGION }}
         project_id: ${{ vars.PROJECT_ID }}
         env_vars: |-

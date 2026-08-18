@@ -73,7 +73,6 @@ var (
 )
 
 const (
-	TENOR_API_KEY   = "TENOR_API_KEY"
 	GIPHY_API_KEY   = "GIPHY_API_KEY"
 	KLIPY_API_KEY   = "KLIPY_API_KEY"
 	BOT_TOKEN       = "BOT_TOKEN"
@@ -313,11 +312,7 @@ func main() {
 		}
 		provider = gifProvider.NewKlipyProvider(apiKey, numLimit)
 	default:
-		apiKey = strings.TrimSpace(os.Getenv(TENOR_API_KEY))
-		if apiKey == "" {
-			log.Fatalf("unable to read tenor API key from environment variable %v", TENOR_API_KEY)
-		}
-		provider = gifProvider.NewTenorProvider(apiKey)
+		log.Fatalln("Tenor has been deprecated, please select an alternate gif provider")
 	}
 
 	publicKey := strings.TrimSpace(os.Getenv(PUBLIC_KEY))
@@ -346,6 +341,7 @@ func main() {
 
 		var interaction discordgo.InteractionCreate
 		if err := json.Unmarshal(body, &interaction); err != nil {
+			log.Printf("error parsing json: %v\n", string(body[:]))
 			http.Error(w, "error parsing json", http.StatusBadRequest)
 			return
 		}
