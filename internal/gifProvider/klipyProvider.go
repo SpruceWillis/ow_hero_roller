@@ -25,7 +25,7 @@ func NewKlipyProvider(apiKey string, limit int) *KlipyProvider {
 }
 
 func (k *KlipyProvider) GetGifUrl(heroName string) (string, error) {
-	queryString := fmt.Sprintf("%v overwatch", heroName)
+	queryString := fmt.Sprintf("%v overwatch hero-roller", heroName)
 	req, err := http.NewRequest("GET", klipySearchUrl, nil)
 	if err != nil {
 		return "", err
